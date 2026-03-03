@@ -11,7 +11,7 @@ jobs:
       - name: Install tools
         run: sudo apt-get update && sudo apt-get install -y wget libarchive-tools squashfs-tools jq
       - name: Create directories
-        run: mkdir -p iso source-iso
+        run: mkdir -p iso source-iso airootfs_parts
       - name: Download all files in NiriWM-Edition from SourceForge
         run: |
           set -e
@@ -29,9 +29,13 @@ jobs:
           done < /tmp/sf_urls.txt
       - name: Set ISO variables
         run: |
-          ISO_NAME=$(ls source-iso/*.iso | xargs -n1 basename)
+          ISO_PATH=$(ls source-iso/*.iso | head -n1)
+          ISO_NAME=$(basename "$ISO_PATH")
           BASE_NAME=${ISO_NAME%.iso}
           TAG_NAME=${BASE_NAME}-system-ota
+          echo "ISO_PATH=$ISO_PATH" >> $GITHUB_ENV
+          echo "ISO_NAME=$ISO_NAME" >> $GITHUB_ENV
+          echo "BASE_NAME=$BASE_NAME" >> $GITHUB_ENV
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
       - name: Extract ISO
         run: |
@@ -42,6 +46,23 @@ jobs:
         run: |
           mkdir -p iso/temp-mnt
           unsquashfs -f -no-xattrs -d iso/temp-mnt iso/arch/x86_64/airootfs.sfs
+      - name: Split airootfs.sfs into parts
+        run: |
+          SFS_PATH="iso/arch/x86_64/airootfs.sfs"
+          SFS_NAME="airootfs.sfs"
+          echo "Splitting $SFS_PATH into 1800MB parts..."
+          split -b 1800M --numeric-suffixes=1 --suffix-length=3 "$SFS_PATH" "airootfs_parts/${SFS_NAME}.part"
+          echo "Generated parts:"
+          ls -lh airootfs_parts/
+      - name: Copy SHA256 checksums
+        run: |
+          if ls source-iso/*.sha256 1>/dev/null 2>&1; then
+            cp source-iso/*.sha256 airootfs_parts/
+            echo "Copied SHA256 files:"
+            ls -lh airootfs_parts/*.sha256
+          else
+            echo "No .sha256 files found in source-iso/, skipping."
+          fi
       - name: Fetch release notes
         run: |
           wget -O release-notes.md https://raw.githubusercontent.com/RengeOS/Release-Notes/main/release-notes.md
@@ -56,5 +77,5 @@ jobs:
           body: ${{ env.RELEASE_NOTES }}
           files: |
             iso/arch/boot/x86_64/vmlinuz-*
-            iso/arch/x86_64/*
             iso/temp-mnt/etc/os-release
+            airootfs_parts/*
