@@ -12,13 +12,13 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y wget libarchive-tools squashfs-tools jq
       - name: Create directories
         run: mkdir -p iso source-iso
-      - name: Download all files from SourceForge
+      - name: Download all files in NiriWM-Edition from SourceForge
         run: |
           set -e
-          SF_PAGE="https://sourceforge.net/projects/rengeos/files/RengeOS-ISO/Latest/Minimal-Edition"
+          SF_PAGE="https://sourceforge.net/projects/rengeos/files/RengeOS-ISO/Latest/NiriWM-Edition"
           echo "Fetching all download URLs from SourceForge page..."
           curl -sL "$SF_PAGE" \
-            | grep -oP 'https://sourceforge\.net/projects/rengeos/files/RengeOS-ISO/Latest/Minimal-Edition/[^"]+/download' \
+            | grep -oP 'https://sourceforge\.net/projects/rengeos/files/RengeOS-ISO/Latest/NiriWM-Edition/[^"]+/download' \
             | sort -u > /tmp/sf_urls.txt
           echo "Found URLs:"
           cat /tmp/sf_urls.txt
