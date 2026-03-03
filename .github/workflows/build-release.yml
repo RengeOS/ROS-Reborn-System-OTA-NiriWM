@@ -15,13 +15,16 @@ jobs:
       - name: Download latest ISO from SourceForge
         run: |
           set -e
-          SF_URL="https://sourceforge.net/projects/rengeos/files/RengeOS-ISO/Latest/NiriWM-Edition/"
-          echo "Fetching latest ISO from SourceForge..."
-          ISO_URL=$(wget -qO- "$SF_URL" \
-            | grep -oP 'https://sourceforge\.net/projects/rengeos/files/RengeOS-ISO/Latest/NiriWM-Edition/[^"]+\.iso/download' \
-            | head -n1)
-          echo "ISO URL: $ISO_URL"
-          wget --content-disposition -P source-iso "$ISO_URL"
+          SF_RSS="https://sourceforge.net/projects/rengeos/files/RengeOS-ISO/Latest/NiriWM-Edition/rss"
+          echo "Fetching ISO filename from SourceForge RSS..."
+          ISO_FILENAME=$(curl -sL "$SF_RSS" \
+            | grep -oP '(?<=<title>)/RengeOS-ISO/Latest/NiriWM-Edition/[^<]+\.iso(?=</title>)' \
+            | head -n1 \
+            | xargs -I{} basename {})
+          echo "ISO filename: $ISO_FILENAME"
+          ISO_URL="https://sourceforge.net/projects/rengeos/files/RengeOS-ISO/Latest/NiriWM-Edition/${ISO_FILENAME}/download"
+          echo "Downloading from: $ISO_URL"
+          wget -O "source-iso/${ISO_FILENAME}" "$ISO_URL"
       - name: Set ISO variables
         run: |
           ISO_NAME=$(ls source-iso/*.iso | xargs -n1 basename)
