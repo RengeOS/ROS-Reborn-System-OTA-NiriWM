@@ -12,22 +12,21 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y wget libarchive-tools squashfs-tools jq
       - name: Create directories
         run: mkdir -p iso source-iso
-      - name: Download latest ISO from SourceForge
+      - name: Download all files from SourceForge
         run: |
           set -e
-          echo "Fetching ISO filename from SourceForge JSON API..."
-          ISO_FILENAME=$(curl -sL \
-            "https://sourceforge.net/projects/rengeos/files/RengeOS-ISO/Latest/NiriWM-Edition/?limit=10&sort=date%20desc&format=json" \
-            | jq -r '.files[] | select(.name | endswith(".iso")) | .name' \
-            | head -n1)
-          echo "ISO filename: $ISO_FILENAME"
-          if [ -z "$ISO_FILENAME" ]; then
-            echo "Could not determine ISO filename from SourceForge API:("
-            exit 1
-          fi
-          ISO_URL="https://sourceforge.net/projects/rengeos/files/RengeOS-ISO/Latest/NiriWM-Edition/${ISO_FILENAME}/download"
-          echo "Downloading from: $ISO_URL"
-          wget -O "source-iso/${ISO_FILENAME}" "$ISO_URL"
+          SF_PAGE="https://sourceforge.net/projects/rengeos/files/RengeOS-ISO/Latest/Minimal-Edition"
+          echo "Fetching all download URLs from SourceForge page..."
+          curl -sL "$SF_PAGE" \
+            | grep -oP 'https://sourceforge\.net/projects/rengeos/files/RengeOS-ISO/Latest/Minimal-Edition/[^"]+/download' \
+            | sort -u > /tmp/sf_urls.txt
+          echo "Found URLs:"
+          cat /tmp/sf_urls.txt
+          while IFS= read -r url; do
+            FILENAME=$(basename "$(dirname "$url")")
+            echo "Downloading: $FILENAME"
+            wget -O "source-iso/${FILENAME}" "$url"
+          done < /tmp/sf_urls.txt
       - name: Set ISO variables
         run: |
           ISO_NAME=$(ls source-iso/*.iso | xargs -n1 basename)
