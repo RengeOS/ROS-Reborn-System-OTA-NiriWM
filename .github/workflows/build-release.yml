@@ -1,0 +1,55 @@
+name: Extract NiriWM ISO and Release
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y wget libarchive-tools squashfs-tools jq
+      - name: Create directories
+        run: mkdir -p iso source-iso
+      - name: Download latest ISO from SourceForge
+        run: |
+          set -e
+          SF_URL="https://sourceforge.net/projects/rengeos/files/RengeOS-ISO/Latest/NiriWM-Edition/"
+          echo "Fetching latest ISO from SourceForge..."
+          ISO_URL=$(wget -qO- "$SF_URL" \
+            | grep -oP 'https://sourceforge\.net/projects/rengeos/files/RengeOS-ISO/Latest/NiriWM-Edition/[^"]+\.iso/download' \
+            | head -n1)
+          echo "ISO URL: $ISO_URL"
+          wget --content-disposition -P source-iso "$ISO_URL"
+      - name: Set ISO variables
+        run: |
+          ISO_NAME=$(ls source-iso/*.iso | xargs -n1 basename)
+          BASE_NAME=${ISO_NAME%.iso}
+          TAG_NAME=${BASE_NAME}-system-ota
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+      - name: Extract ISO
+        run: |
+          cd source-iso
+          bsdtar -xf *.iso -C ../iso
+          cd ..
+      - name: Extract os-release from airootfs
+        run: |
+          mkdir -p iso/temp-mnt
+          unsquashfs -f -no-xattrs -d iso/temp-mnt iso/arch/x86_64/airootfs.sfs
+      - name: Fetch release notes
+        run: |
+          wget -O release-notes.md https://raw.githubusercontent.com/RengeOS/Release-Notes/main/release-notes.md
+          echo "RELEASE_NOTES<<EOF" >> $GITHUB_ENV
+          cat release-notes.md >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          name: ${{ env.TAG_NAME }}
+          body: ${{ env.RELEASE_NOTES }}
+          files: |
+            iso/arch/boot/x86_64/vmlinuz-*
+            iso/arch/x86_64/*
+            iso/temp-mnt/etc/os-release
